@@ -25,7 +25,10 @@ def main():
     data = pd.concat([df, dfnoM], ignore_index=True)
     datasubs = data[[i for i in range(30)]]
 
-
+    # Shuffle DataFrame
+    # shuffleddf = data.sample(frac=1).reset_index(drop=True)
+    # dfN = shuffleddf.iloc[0:35]
+    # dfN.to_csv('Test.csv')
 
     getF = getFeatures(datasubs.values)
 
@@ -34,13 +37,13 @@ def main():
     F4 = getF.movingStd()
     F5 = getF.kurtosis()
 
-    pca = getPCA(np.concatenate((F1, F2[:, None], F4, F5[:,None]), axis=1)).pca()
-    #dataMatrix = np.concatenate((F1, F2[:, None], F3[:, None], F4), axis=1)
+    pca = getPCA(np.concatenate((F1, F2[:, None], F4, F5[:, None]), axis=1)).pca()
+    # dataMatrix = np.concatenate((F1, F2[:, None], F3[:, None], F4), axis=1)
 
     X = pca
     Y = data[30].values
 
-    data = np.concatenate((X,Y[:,None]),axis=1) #add labels
+    data = np.concatenate((X, Y[:, None]), axis=1)  # add labels
     execKfold(data)
 
     # X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3)
@@ -48,18 +51,7 @@ def main():
     # a = Models()
     # a.fit('ANN',X_train,Y_train)
     # print(a.predict(X_test,Y_test,'ANN'))
-    #RandomForest(X,Y)
-
-
-
-
-
-
-
-
-
-
-
+    # RandomForest(X,Y)
 
 
 main()
