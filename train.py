@@ -8,15 +8,11 @@ import pandas as pd
 import numpy as np
 
 np.set_printoptions(suppress=True)
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.externals import joblib
 from sklearn.model_selection import KFold
+import joblib
 
 
-
-class GetDirs():
+class GetDirs:
 
     def getDirs(self, root):
         fileList = []
@@ -27,22 +23,6 @@ class GetDirs():
                     fileList.append(root + '/' + file)
 
         return fileList
-
-    def missingValues(self, dfL, dfN):
-        # Interpolate to remove nan values
-
-        df_series_list = dfL.values.tolist()
-        correctedDF = self.missingValuesHelper(dfL, df_series_list)
-        indexes = correctedDF[correctedDF[correctedDF.columns[0]].isnull()].index.tolist()
-        if len(indexes) >= 1:  # remove nans from both series
-            for i in indexes:
-                correctedDF = correctedDF.drop(i)
-                dfN = dfN.drop(i)
-
-        dfN_series_list = dfN.values.tolist()
-        dfDateNum = self.missingValuesHelper(dfN, dfN_series_list)
-
-        return np.array(correctedDF), np.array(dfDateNum)
 
     def missingValuesHelper(self, df, dfSeries):
         interpolated_data = []
@@ -55,22 +35,23 @@ class GetDirs():
     def getMealNoMealData(self, listFileNames, types=None):
 
         if types == 'Meal':
-            df = pd.read_csv(listFileNames, names=list(range(30)))
+            df = pd.read_csv(listFileNames, names=list(range(31)))
 
         else:
-            df = pd.read_csv(listFileNames, names=list(range(30)))
+            df = pd.read_csv(listFileNames, names=list(range(31)))
 
         df_series_list = df.values.tolist()
         correctedDF = self.missingValuesHelper(df, df_series_list)
         indexes = correctedDF[correctedDF[correctedDF.columns[0]].isnull()].index.tolist()
+        vals = correctedDF.mean(axis=0).tolist()
         if len(indexes) >= 1:  # remove nans from both series
             for i in indexes:
-                correctedDF = correctedDF.drop(i)
+                correctedDF.loc[i] = vals
 
         return np.array(correctedDF)
 
 
-class Models():
+class Models:
     def __init__(self):
 
         self.model = None
@@ -84,7 +65,7 @@ class Models():
             self.model = AdaBoostClassifier(n_estimators=100, random_state=0)
 
         elif modelName == 'RandomForest':
-            self.model = RandomForestClassifier(n_estimators=100, max_features='sqrt', max_depth=220)  # 944 auto 140
+            self.model = RandomForestClassifier(n_estimators=733, max_features='sqrt', max_depth=260)  # 944 auto 140
 
         self.model.fit(X_train, Y_train)
 
@@ -99,7 +80,7 @@ class Models():
         return [accuarcy, otherMetrics['f1-score'], otherMetrics['recall'], otherMetrics['precision']]
 
 
-class getFeatures():
+class getFeatures:
     def __init__(self, dataCleaned):
         self.data = dataCleaned
         self.dataTransposed = dataCleaned.T
@@ -135,54 +116,39 @@ class getFeatures():
         return np.array([tcal.kurtosis(self.data[i, :]) for i in range(len(self.data))])
 
 
-class getPCA():
-    def __init__(self, featureMat):
-        self.mat = featureMat
-        self.normData = StandardScaler().fit_transform(self.mat)
-        self.pca_timeSeries = PCA(n_components=5)
-        self.PCs = self.pca_timeSeries.fit_transform(self.normData)
-        self.df = pd.DataFrame(self.PCs, columns=['PC1', 'PC2', 'PC3', 'PC4', 'PC5'])
+def execKfold(featureMat, scorelabels):
+    testmod1 = []
+    testmod2 = []
+    testmod3 = []
 
-    def pca(self):
-        return self.df.values
-
-    def results(self):
-        return self.pca_timeSeries.explained_variance_ratio_
-
-
-def execKfold(featureMat):
-    kf = KFold(10, True, 1)
-    testmodel1 = []
-    testmodel2 = []
-    testmodel3 = []
-    for train_index, test_index in kf.split(featureMat):
-        train, test = featureMat[train_index], featureMat[test_index]
+    k_f = KFold(n_splits=10, shuffle=True, random_state=1)
+    for train_ind, test_ind in k_f.split(featureMat):
+        train, test = featureMat[train_ind], featureMat[test_ind]
         X_train, Y_train, X_test, Y_test = train[:, :-1], train[:, -1], test[:, :-1], test[:, -1]
         models = kfoldTrain(X_train, Y_train)
-        p1, p2, p3 = testing(models, X_test, Y_test)
-        testmodel1.append(p1)
-        testmodel2.append(p2)
-        testmodel3.append(p3)
+        mdt1, mdt2, mdt3 = testing(models, X_test, Y_test)
+        testmod1.append(mdt1)
+        testmod2.append(mdt2)
+        testmod3.append(mdt3)
 
-    testmodel1 = np.array(testmodel1)
-    testmodel2 = np.array(testmodel2)
-    testmodel3 = np.array(testmodel3)
+    testmod1 = np.array(testmod1)
+    testmod2 = np.array(testmod2)
+    testmod3 = np.array(testmod3)
 
-    result1 = np.mean(testmodel1, axis=0)
-    result2 = np.mean(testmodel2, axis=0)
-    result3 = np.mean(testmodel3, axis=0)
+    result1 = np.mean(testmod1, axis=0)
+    result2 = np.mean(testmod2, axis=0)
+    result3 = np.mean(testmod3, axis=0)
 
-    resultlabels = ['Accuracy', 'F1-score', 'Recall', 'Precision']
     for ind, i in enumerate(list(result1)):
-        print('{0} is {1} for SVM \n'.format(resultlabels[ind], i))
+        print('{0} is {1} for SVM \n'.format(scorelabels[ind], i))
     print('------------------------------------------------------')
 
     for ind, i in enumerate(list(result2)):
-        print('{0} is {1} for AdaBoost \n'.format(resultlabels[ind], i))
+        print('{0} is {1} for AdaBoost \n'.format(scorelabels[ind], i))
     print('------------------------------------------------------')
 
     for ind, i in enumerate(list(result3)):
-        print('{0} is {1} for RandomForest \n'.format(resultlabels[ind], i))
+        print('{0} is {1} for RandomForest \n'.format(scorelabels[ind], i))
 
 
 def kfoldTrain(X_train, Y_train):
@@ -205,7 +171,10 @@ def testing(model, X_Test, Y_Test):
 
 
 def main():
+    # Get data
     a = GetDirs()
+
+    # MealData and NoMealData directory for the csv files
 
     f1 = a.getDirs('MealData')
     f2 = a.getDirs('NoMealData')
@@ -216,38 +185,40 @@ def main():
     df = pd.DataFrame(data=meal)
     dfnoM = pd.DataFrame(data=noMeal)
 
-    df[30] = [1 for i in range(len(meal))]
-    dfnoM[30] = [0 for i in range(len(noMeal))]
+    # Label Data 0-> No Meal 1-> Meal
+    df[31] = [1 for i in range(len(meal))]
+    dfnoM[31] = [0 for i in range(len(noMeal))]
     data = pd.concat([df, dfnoM], ignore_index=True)
-    datasubs = data[[i for i in range(30)]]
+    datasubs = data[[i for i in range(31)]]
 
+    # Extract Features
     getF = getFeatures(datasubs.values)
-
     F1 = getF.fft()
     F2 = getF.entropy()
     F4 = getF.movingStd()
     F5 = getF.kurtosis()
 
-    pca = getPCA(np.concatenate((F1, F2[:, None], F4, F5[:, None]), axis=1)).pca()
+    dataMatrix = np.concatenate((F1, F2[:, None], F4, F5[:, None]), axis=1)
+    X = pd.DataFrame(data=dataMatrix)
+    Y1 = data[31]
+    selectedFeatures = [1, 2, 3, 4, 5, 6, 17, 18, 19, 20, 21, 30]  # Used Random forest to select best features
 
-    X = pca
-    Y1 = data[30].values
+    # Apply K-fold on 3 models SVM, AdaBoost and Random Forest
 
-    data_new = np.concatenate((X, Y1[:, None]), axis=1)  # add labels
-    execKfold(data_new)
+    scorelabels = ['Accuracy', 'F1-score', 'Recall', 'Precision']
 
-    print('-------Using Support Vector Machine-------------------')
+    data_new = np.concatenate((X[[i for i in selectedFeatures]], Y1[:, None]), axis=1)  # add labels
+    execKfold(data_new, scorelabels)
+
+    print('-------Using Random Forest-------------------')
+
     Y = data_new[:, -1]
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3)
     m = Models()
-    m.fit('SVM', X_train, Y_train)
-    # svm_from_joblib = joblib.load('trainedModel.pkl')
-    # prediction = svm_from_joblib.predict(X_test,Y_test)
-    # accuarcy = accuracy_score(Y_test, prediction, normalize=True)
-    # print(accuarcy)
+    m.fit('RandomForest', X[[i for i in selectedFeatures]], Y)
+
     joblib.dump(m, 'trainedModel.pkl')
 
-    print('Sucess! \n Saved model to trainedModel.pkl')
+    print('Success! \n Saved model to trainedModel.pkl')
 
 
 if __name__ == '__main__':

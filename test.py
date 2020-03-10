@@ -1,22 +1,42 @@
-import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.metrics import *
 from sklearn.svm import SVC
 import tsfresh.feature_extraction.feature_calculators as tcal
 import pandas as pd
 import numpy as np
-
+import joblib
 np.set_printoptions(suppress=True)
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn.externals import joblib
-from sklearn.model_selection import KFold
 import sys
 
 
-class Models():
+class GetDirs:
+
+    def missingValuesHelper(self, df, dfSeries):
+        interpolated_data = []
+        for series in dfSeries:
+            cleaned_data = pd.Series(series).interpolate(method='linear', limit_direction='forward').to_list()
+            interpolated_data.append(cleaned_data)
+
+        return pd.DataFrame(interpolated_data, columns=df.columns)
+
+    def getMealNoMealData(self, listFileNames):
+
+        df = pd.read_csv(listFileNames, names=list(range(31)))
+
+        df_series_list = df.values.tolist()
+        correctedDF = self.missingValuesHelper(df, df_series_list)
+
+        indexes = correctedDF[correctedDF[correctedDF.columns[0]].isnull()].index.tolist()
+        vals = correctedDF.mean(axis=0).tolist()
+
+        if len(indexes) >= 1:  # remove nans from both series
+            for i in indexes:
+                correctedDF.loc[i] = vals
+
+        return np.array(correctedDF)
+
+
+class Models:
     def __init__(self):
 
         self.model = None
@@ -40,7 +60,7 @@ class Models():
         return [i for i in prediction]
 
 
-class getFeatures():
+class getFeatures:
     def __init__(self, dataCleaned):
         self.data = dataCleaned
         self.dataTransposed = dataCleaned.T
@@ -76,52 +96,46 @@ class getFeatures():
         return np.array([tcal.kurtosis(self.data[i, :]) for i in range(len(self.data))])
 
 
-class getPCA():
-    def __init__(self, featureMat):
-        self.mat = featureMat
-        self.normData = StandardScaler().fit_transform(self.mat)
-        self.pca_timeSeries = PCA(n_components=5)
-        self.PCs = self.pca_timeSeries.fit_transform(self.normData)
-        self.df = pd.DataFrame(self.PCs, columns=['PC1', 'PC2', 'PC3', 'PC4', 'PC5'])
-
-    def pca(self):
-        return self.df.values
-
-    def results(self):
-        return self.pca_timeSeries.explained_variance_ratio_
-
-
-
 def main():
+    filename = input("[Note: If File in not under same directory please enter entire directory address] \n \nEnter the "
+                     "Test File Name : ")
 
-    #Read given CSV
+    # Read given CSV
+    try:
+        dataarr = GetDirs().getMealNoMealData(filename)
 
-    data = pd.read_csv('Test_updated.csv',header=None)
+    except Exception as e:
+        print("Couldn't find file under {0} Please Run and Try again!".format(filename))
+        sys.exit(1)
 
-    datasubs = data[[i for i in range(30)]]
-    getF = getFeatures(datasubs.values)
+    data = pd.DataFrame(data=dataarr)
 
+    # Get Features
+    getF = getFeatures(data.values)
     F1 = getF.fft()
     F2 = getF.entropy()
     F4 = getF.movingStd()
     F5 = getF.kurtosis()
 
-    X_test = getPCA(np.concatenate((F1, F2[:, None], F4, F5[:, None]), axis=1)).pca()
+    # Select feature subset
+    selectedFeatures = [1, 2, 3, 4, 5, 6, 17, 18, 19, 20, 21, 30]
 
+    X_test = np.concatenate((F1, F2[:, None], F4, F5[:, None]), axis=1)
+    df_train = pd.DataFrame(data=X_test)
+
+    # Load Model
     svm_from_joblib = joblib.load('trainedModel.pkl')
-    prediction = svm_from_joblib.predict(X_test)
 
-    alist = data[30].values.tolist()
+    # Run Prediction on Testset
+    prediction = svm_from_joblib.predict(df_train[[i for i in selectedFeatures]])
 
-    for indx,i in enumerate(np.array(prediction)):
-        print(i,alist[indx])
+    print('[Note: 1.0 is for Meal Data and 0.0 is for no Meal Data] \n Predictions are as follows:- \n \n')
 
+    count = 0
 
-    # svm_from_joblib = joblib.load('trainedModel.pkl')
-    # prediction = svm_from_joblib.predict(X_test,Y_test)
-    # accuarcy = accuracy_score(Y_test, prediction, normalize=True)
-    # print(accuarcy)
-
+    for i in prediction:
+        print('Row {0} prediction is --> {1}'.format(count, i))
+        count += 1
 
 
 if __name__ == '__main__':
