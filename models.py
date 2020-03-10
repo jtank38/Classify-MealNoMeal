@@ -7,19 +7,32 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import *
 from sklearn.svm import SVC
 import numpy as np
-
+from sklearn.feature_selection import SelectFromModel
+import sys
 
 
 def RandomForest(X, Y):
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.3)
+    # votedict = {}
+    # for i in range(100):
+    #     sel = SelectFromModel(RandomForestClassifier(n_estimators=200))
+    #     sel.fit(X, Y)
+    #     selected_feat = X.columns[(sel.get_support())]
+    #     for i in selected_feat:
+    #         if i not in votedict:
+    #             votedict[i] = 1
+    #         else:
+    #             votedict[i] += 1
+    # print(votedict)
+
+    selectedFeatures = [1,2,3,4,5,6,17, 18, 19, 20, 21, 30]
 
     model = RandomForestClassifier()
-
-    # model.fit(X_train, Y_train)
+    # model.fit(X_train[[i for i in selectedFeatures]], Y_train)
     #
-    # rf_predictions = model.predict(X_test)
+    # rf_predictions = model.predict(X_test[[i for i in selectedFeatures]])
     #
-    # rfc_cv_score = cross_val_score(model, X, Y, cv=10, scoring="roc_auc")
+    # rfc_cv_score = cross_val_score(model, X, Y, cv=20, scoring="roc_auc")
     # print(classification_report(Y_test, rf_predictions))
     # print('all scores is {}'.format(rfc_cv_score.mean()))
 
@@ -35,7 +48,7 @@ def RandomForest(X, Y):
     rfc_random = RandomizedSearchCV(estimator=model, param_distributions=random_grid, n_iter=100, cv=3, verbose=2,
                                     random_state=42, n_jobs=-1)
 
-    rfc_random.fit(X_train, Y_train)
+    rfc_random.fit(X_train[[i for i in selectedFeatures]], Y_train)
     print(rfc_random.best_params_)
 
 
@@ -71,10 +84,11 @@ class Models():
             self.model = SVC(kernel='rbf', gamma='scale')
 
         elif modelName == 'AdaBoost':
-            self.model = AdaBoostClassifier(n_estimators=100, random_state=0)
+            self.model = AdaBoostClassifier(n_estimators=100, random_state=1)
 
         elif modelName == 'RandomForest':
-            self.model = RandomForestClassifier(n_estimators=100, max_features='sqrt', max_depth=220)  # 944 auto 140
+
+            self.model = RandomForestClassifier(n_estimators=200, max_features='sqrt', max_depth=None)  # 944 auto 140
 
         self.model.fit(X_train, Y_train)
 

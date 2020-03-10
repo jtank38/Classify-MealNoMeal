@@ -4,7 +4,7 @@ import sys
 
 
 def execKfold(featureMat):
-    kf = KFold(10, True, 1)
+    kf = KFold(20, True, 1)
     testmodel1 = []
     testmodel2 = []
     testmodel3 = []

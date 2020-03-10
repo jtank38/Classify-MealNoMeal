@@ -3,7 +3,6 @@ import numpy as np
 import os
 
 
-
 class GetDirs():
 
     def getDirs(self, root):
@@ -15,7 +14,6 @@ class GetDirs():
                     fileList.append(root + '/' + file)
 
         return fileList
-
 
     def missingValues(self, dfL, dfN):
         # Interpolate to remove nan values
@@ -41,24 +39,22 @@ class GetDirs():
 
         return pd.DataFrame(interpolated_data, columns=df.columns)
 
-
     def getMealNoMealData(self, listFileNames, types=None):
 
-
-
         if types == 'Meal':
-            df = pd.read_csv(listFileNames, names=list(range(30)))
+            df = pd.read_csv(listFileNames, names=list(range(31)))
 
         else:
-            df = pd.read_csv(listFileNames, names=list(range(30)))
+            df = pd.read_csv(listFileNames, names=list(range(31)))
 
         df_series_list = df.values.tolist()
         correctedDF = self.missingValuesHelper(df, df_series_list)
         indexes = correctedDF[correctedDF[correctedDF.columns[0]].isnull()].index.tolist()
+        vals = [int(i) for i in correctedDF.mean(axis=0).tolist()]
+
         if len(indexes) >= 1:  # remove nans from both series
             for i in indexes:
-                 correctedDF = correctedDF.drop(i)
-
+                correctedDF.loc[i] = vals
 
         return np.array(correctedDF)
 
@@ -70,9 +66,9 @@ if __name__ == '__main__':
     meal = np.array([])
     noMeal = np.array([])
 
-    meal = np.concatenate([a.getMealNoMealData(i,'Meal') for i in f1])
+    meal = np.concatenate([a.getMealNoMealData(i, 'Meal') for i in f1])
     noMeal = np.concatenate([a.getMealNoMealData(i) for i in f2])
 
     # meal = a.getMealNoMealData(f1,'Meal')
     # noMeal = a.getMealNoMealData(f1)
-    print(meal.shape,noMeal.shape)
+    print(meal.shape, noMeal.shape)
